@@ -5,7 +5,7 @@ from requests.adapters import BaseAdapter
 from requests import PreparedRequest, Response
 
 
-__version__ = '0.1.0'
+__version__ = '0.1.1'
 
 
 class SeekError(OSError):
