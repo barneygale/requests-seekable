@@ -19,7 +19,7 @@ class SeekableResponse:
     _length: int = -1
     _offset: int = 0
 
-    def __init__(self, response: Response):
+    def __init__(self, response: Response, minimum_seek: int = 1024):
         self._adapter = response.connection
         self._request = response.request
         self._reader = response.raw
@@ -29,6 +29,7 @@ class SeekableResponse:
         accept_ranges = response.headers.get('accept-ranges')
         if accept_ranges != 'bytes':
             raise SeekError('server does not accept range headers')
+        self._minimum_seek = minimum_seek
 
     def __getattr__(self, name):
         return getattr(self._reader, name)
@@ -46,7 +47,10 @@ class SeekableResponse:
         elif whence != SEEK_SET:
             raise SeekError(f'seek failed: invalid argument {whence=}')
 
-        if offset != self.tell():
+        delta = offset - self.tell()
+        if 0 < delta < self._minimum_seek:
+            self.read(delta)
+        elif delta != 0:
             request = self._request.copy()
             request.headers['range'] = f'bytes={offset}-'
             response = self._adapter.send(request, stream=True)
