@@ -1,7 +1,7 @@
 from os import SEEK_SET, SEEK_CUR, SEEK_END
 from io import BufferedIOBase, BytesIO
 
-from http.client import HTTPResponse
+from urllib3.response import HTTPResponse
 from requests.adapters import BaseAdapter
 from requests import PreparedRequest, Response
 from typing import Any
