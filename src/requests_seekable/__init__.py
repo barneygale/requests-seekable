@@ -1,8 +1,10 @@
 from os import SEEK_SET, SEEK_CUR, SEEK_END
 from io import BufferedIOBase, BytesIO
 
+from http.client import HTTPResponse
 from requests.adapters import BaseAdapter
 from requests import PreparedRequest, Response
+from typing import Any
 
 
 __version__ = '0.1.1'
@@ -19,7 +21,9 @@ class SeekableResponse:
     _length: int = -1
     _offset: int = 0
 
-    def __init__(self, response: Response, minimum_seek: int = 1024):
+    def __init__(self, response: Response, minimum_seek: int = 1024) -> None:
+        if not isinstance(response.raw, HTTPResponse):
+            raise SeekError('http response is not streamed')
         self._adapter = response.connection
         self._request = response.request
         self._reader = response.raw
@@ -31,13 +35,13 @@ class SeekableResponse:
             raise SeekError('server does not accept range headers')
         self._minimum_seek = minimum_seek
 
-    def __getattr__(self, name):
+    def __getattr__(self, name: str) -> Any:
         return getattr(self._reader, name)
 
-    def seekable(self):
+    def seekable(self) -> bool:
         return True
 
-    def seek(self, offset, whence=SEEK_SET):
+    def seek(self, offset: int, whence: int = SEEK_SET) -> int:
         if whence == SEEK_END:
             if self._length == -1:
                 raise SeekError('seek failed: unknown content length')
@@ -55,6 +59,7 @@ class SeekableResponse:
             request.headers['range'] = f'bytes={offset}-'
             response = self._adapter.send(request, stream=True)
             if response.status_code == 206:  # partial content
+                assert isinstance(response.raw, HTTPResponse)
                 self._reader.close()
                 self._reader = response.raw
                 self._offset = offset
@@ -64,6 +69,7 @@ class SeekableResponse:
                 self._offset = offset
             else:
                 raise SeekError(f'seek failed: invalid status {response=}')
+        return offset
 
-    def tell(self):
+    def tell(self) -> int:
         return self._offset + self._reader.tell()
